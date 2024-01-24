@@ -1,10 +1,11 @@
-from sql_query import SQL_atm
+from sql_query_7_9 import SQL_atm
 
 class ATM():
     def atm_logic(self):
 
         SQL_atm.create_table()
         SQL_atm.insert_users((1234, 1111, 10000))
+        SQL_atm.insert_users((2345, 2222, 10000))
         number_card = input("Введите пожалуйста номер карты: ")
 
         while True:
