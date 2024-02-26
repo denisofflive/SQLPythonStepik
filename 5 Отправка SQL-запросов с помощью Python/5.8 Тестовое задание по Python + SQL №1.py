@@ -1,34 +1,27 @@
+import os
 import sqlite3
-from pathlib import Path
-
-DATABASE_DIR = Path(__file__).parent
 
 
 def check_that_int():
-    """
-    Эта функция проверяет, что пользователь вводит int
-    :return: num
-    """
     while True:
         print('Введите код:')
         try:
             num = int(input())
             return num
-        except Exception as Ex:
-            print('Введите номер!\n', Ex)
+        except ValueError:
+            print('Введите номер!')
+            print('Попробуйте снова?')
+            print('Выберите Y/N')
+            answer = input()
+            answer = answer.lower()
+            if answer == 'y':
+                continue
+            else:
+                print("Вы ввели неверные данные")
+                break
 
 
-def select_one_option():
-    """
-    Выберите один из вариантов:
-    1=Регистрация нового пользователя
-
-    2=Авторизация в системе
-
-    3=Восстановление пароля
-    :return: option
-    """
-
+def select_option():
     options_list = [1, 2, 3]
     while True:
         print(
@@ -43,16 +36,10 @@ def select_one_option():
         except ValueError:
             print('Введите номер')
 
+def check_login(cursor):
 
-def check_login():
-    """
-    :return: логин или проверка логина
-    """
-    db = sqlite3.connect(DATABASE_DIR / (r'registration' + '.db'))  # Создание БД
-    print('Подключились к базе данных')
-    cur = db.cursor()
-    cur.execute('''select Login, Password, Code from users_data;''')
-    login_on_table = cur.fetchall()
+    cursor.execute('''select Login, Password, Code from users_data;''')
+    login_on_table = cursor.fetchall()
     loginID_list = []
     for i in range(len(login_on_table)):
         loginID_list.append(login_on_table[i][0])
@@ -82,13 +69,9 @@ def check_login():
         elif login not in loginID_list and len(login) >= 2:
             return login
         else:
-            return check_login()
-
+            return check_login(cursor)
 
 def check_password():
-    """
-    :return: пароль или проверка пароля
-    """
     while True:
         print('Введите Ваш пароль:')
         password = input()
@@ -108,53 +91,25 @@ def check_password():
         else:
             return check_password()
 
-
-def check_that_int():
-    while True:
-        print('Введите код:')
-        try:
-            num = int(input())
-            return num
-        except ValueError:
-            print('Введите номер!')
-            print('Попробуйте снова?')
-            print('Выберите Y/N')
-            answer = input()
-            answer = answer.lower()
-            if answer == 'y':
-                continue
-            else:
-                break
-
-
-def registration():
+def registration(cursor):
     """
     :return: логин, пароль, код
     """
     while True:
-        login = check_login()
+        login = check_login(cursor)
         if login is None:
             break
         password = check_password()
         if password is None:
             break
         if login is not None and password is not None:
-            try:
-                code = check_that_int()
+            code = check_that_int()
+            if code:
                 return login, password, code
-            except Exception as Ex:
-                print('Вы ввели неверные данные\n', Ex)
-                break
-        else:
-            print('Вы ввели неверные данные')
-            break
-
+        print('Вы ввели неверные данные')
+        break
 
 def gen_dict(val):
-    """
-    :param val:
-    :return: login_password
-    """
     result = val
     login_password = {}
     for login, password, code in list(result):
@@ -163,10 +118,6 @@ def gen_dict(val):
 
 
 def check_login_and_password(database_dict):
-    """
-    :param database_dict:
-    :return:
-    """
     while True:
         print('Введите Ваш логин: ')
         login = input()
@@ -192,12 +143,7 @@ def check_login_and_password(database_dict):
             else:
                 break
 
-
 def recovery_password(database_dict):
-    """
-    :param database_dict:
-    :return: password, login
-    """
     while True:
         print('Введите Ваш логин: ')
         login = input()
@@ -241,43 +187,48 @@ def recovery_password(database_dict):
             else:
                 break
 
-
-'''Создание базы данных'''
-try:
-    db = sqlite3.connect(DATABASE_DIR / (r'registration' + '.db'))
-    print('Подключились к базе данных')
-    cur = db.cursor()
-    '''Создание таблицы users_data'''
-    user_value = "('Ivan', 'qwer1234', 1234)"
-    cur.executescript(f'''CREATE TABLE IF NOT EXISTS users_data
-                        (Login text not null primary key ,
-                         Password text not null ,
-                         Code  integer not null);
-
-                         INSERT INTO users_data(Login, Password, Code)
-                            values {user_value};''')
-    db.commit()
-    cur.execute('''select "Login" from users_data;''')
-    user_in_db = cur.fetchall()
-    print('Таблица создана')
-    print('Пользователь добавлен')
-except Exception as Ex:
-    print(Ex)
+def connect_to_db(path_to_db):
     try:
-        choice = select_one_option()
+        db = sqlite3.connect(path_to_db)
+        print('Подключение к БД прошло успешно')
+        return db
+    except Exception as error:
+        print(f"Что-то пошло не так.Ошибка: {error}")
+        exit(-1)
+
+def create_table(cursor, db):
+    try:
+        user_value = "('Ivan', 'qwer1234', 1234)"
+        cursor.executescript(
+            f'''CREATE TABLE IF NOT EXISTS users_data
+            (Login text not null primary key, Password text not null , Code  integer not null);
+            INSERT INTO users_data(Login, Password, Code)
+            values {user_value};''')
+        print('Таблица создана')
+        print('Пользователь добавлен')
+        db.commit()
+    except Exception as error:
+        print(f"При создании таблицы и добавлении пользователя произошла ошибка: {error}")
+
+def main(path_to_db):
+    db = connect_to_db(path_to_db)
+    cursor = db.cursor()
+    create_table(cursor, db)
+    try:
+        choice = select_option()
         if choice == 1:
             try:
-                login, password, code = registration()
+                login, password, code = registration(cursor)
             except TypeError:
                 print('Обязательные поля: Логин, Пароль, Код!!!')
-            cur.execute('''select Login, Password, Code from users_data;''')
-            login_on_table = cur.fetchall()
+            cursor.execute('''select Login, Password, Code from users_data;''')
+            login_on_table = cursor.fetchall()
             loginID_list = []
             for i in range(len(login_on_table)):
                 loginID_list.append(login_on_table[i][0])
             try:
                 if login not in loginID_list:
-                    cur.execute(f'''INSERT INTO users_data
+                    cursor.execute(f'''INSERT INTO users_data
                                         VALUES ('{login}','{password}', {code})''')
                     db.commit()
                     print(f'Вы успешно создали пользователя:')
@@ -287,23 +238,27 @@ except Exception as Ex:
                     print('Логин уже занят!!!')
             except Exception as Ex:
                 print('Попробуйте снова!\n')
-
         if choice == 2:
             print('Авторизация в системе')
-            cur.execute('''Select Login, Password, Code from users_data;''')
-            result = cur.fetchall()
+            cursor.execute('''Select Login, Password, Code from users_data;''')
+            result = cursor.fetchall()
             database_dict = gen_dict(result)
             check_login_and_password(database_dict)
         if choice == 3:
-            cur.execute('''Select Login, Password, Code from users_data;''')
-            result = cur.fetchall()
+            cursor.execute('''Select Login, Password, Code from users_data;''')
+            result = cursor.fetchall()
             database_dict = gen_dict(result)
             try:
                 new_password, user_name = recovery_password(database_dict)
-                cur.execute(f"""UPDATE users_data SET Password = '{new_password}' WHERE Login = '{user_name}';""")
+                cursor.execute(f"""UPDATE users_data SET Password = '{new_password}' WHERE Login = '{user_name}';""")
                 db.commit()
             except Exception as Ex:
                 print('Пароль не был восстановлен.\n')
-
     finally:
-        cur.close()
+            cursor.close()
+
+if __name__ == "__main__":
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    DB_NAME = "registration.db"
+    PATH_TO_DB = os.path.join(BASE_DIR, DB_NAME)
+    main(PATH_TO_DB)

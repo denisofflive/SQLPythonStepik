@@ -1,124 +1,89 @@
 import sqlite3
 
 
-class SQL_mobile:
-    """Создание таблиц"""
+def create_tables(db, cur):
+    print('Создаю таблицу mobile_users')
+    cur.execute("""CREATE TABLE IF NOT EXISTS mobile_users(
+        UserID INTEGER PRIMARY KEY AUTOINCREMENT,
+        User_name VARCHAR(255) NOT NULL,
+        Balance INTEGER NOT NULL,
+        Mobile_tariff_ref INTEGER NOT NULL,
+        Activity VARCHAR(255) NOT NULL);""")
 
-    @staticmethod
-    def create_table():
-        with sqlite3.connect('mobile.db') as db:
-            cur = db.cursor()
+    print('Создаю таблицу mobile_tariff')
+    cur.execute("""CREATE TABLE IF NOT EXISTS mobile_tariff(
+        TariffID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Tariff VARCHAR(255) NOT NULL, 
+        Price INTEGER NOT NULL);""")
+    db.commit()
 
-            cur.execute("""CREATE TABLE IF NOT EXISTS mobile_users(
-                UserID INTEGER PRIMARY KEY AUTOINCREMENT,
-                User_name VARCHAR(255) NOT NULL,
-                Balance INTEGER NOT NULL,
-                Mobile_tariff_ref INTEGER NOT NULL,
-                Activity VARCHAR(255) NOT NULL);""")
-            print('Создание таблицы mobile_users')
 
-            cur.execute("""CREATE TABLE IF NOT EXISTS mobile_tariff(
-                TariffID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Tariff VARCHAR(255) NOT NULL, 
-                Price INTEGER NOT NULL);""")
-            db.commit()
-            print('Создание таблицы mobile_tariff')
-
-    """Заполнение таблицы mobile_users"""
-
-    @staticmethod
-    def insert_users(data_users):
-        with sqlite3.connect("mobile.db") as db:
-            cur = db.cursor()
-            cur.execute(
-                """INSERT INTO mobile_users (User_name, Balance, Mobile_tariff_ref, Activity) VALUES(?, ?, ?, ?);""",
+def insert_users(db, cur, data_users):
+    print(f'Создание нового пользователя с данными: {data_users}')
+    cur.execute("""INSERT INTO mobile_users (User_name, Balance, Mobile_tariff_ref, Activity) VALUES(?, ?, ?, ?);""",
                 data_users)
-            db.commit()
-            print('Создание нового пользователя')
+    db.commit()
 
-    """Заполнение таблицы mobile_tariff"""
 
-    @staticmethod
-    def insert_tariff(data_tariff):
-        with sqlite3.connect("mobile.db") as db:
-            cur = db.cursor()
+def insert_tariff(db, cur, data_tariff):
+    print(f'Создание нового тарифа c данными: {data_tariff}')
+    cur.execute("""INSERT INTO mobile_tariff (Tariff, Price) VALUES(?, ?);""", data_tariff)
+    db.commit()
 
-            cur.execute(
-                """INSERT INTO mobile_tariff (Tariff, Price) VALUES(?, ?);""",
-                data_tariff)
-            db.commit()
-            print('Создание нового тарифа')
 
-    """Количество активных пользователей"""
+def show_active_user(cur):
+    cur.execute(
+        """SELECT UserID, User_name, Activity, Tariff, Price FROM mobile_users INNER JOIN mobile_tariff ON TariffID = Mobile_tariff_ref;""")
+    table_user = cur.fetchall()
+    data_user = table_user
+    print('Активные пользователи:\n')
+    for user in data_user:
+        if user[2] == 'Yes':
+            print(f"Login - {user[1]}, " + f"Active - {user[2]}, " + f"Tariff - {user[3]}.")
 
-    @staticmethod
-    def active_user():
 
-        with sqlite3.connect("mobile.db") as db:
-            cur = db.cursor()
-
-            cur.execute(
-                """SELECT UserID, User_name, Activity, Tariff, Price FROM mobile_users 
+def withdraw_money(db, cur, period):
+    for num_p in range(1, period):
+        cur.execute(
+            """SELECT UserID, User_name, Balance, Activity, Tariff, Price FROM mobile_users 
                 INNER JOIN mobile_tariff ON TariffID = Mobile_tariff_ref;""")
-            table_user = cur.fetchall()
-            data_user = table_user
-            db.commit()
+        active_users = cur.fetchall()
+        for user in active_users:
+            if user[3] == 'No':
+                continue
+            print(f"{user[1]} снятие денежных средств {user[5]} за месяц {num_p}")
+            if int(user[2]) <= int(user[5]):
+                print(f"{user[1]} недостаточно средств для совершения операции.Баланс: {user[2]}.Требуется: {user[5]}")
+                cur.execute(f"""UPDATE mobile_users SET Activity='No' WHERE UserID={user[0]};""")
+                db.commit()
+            else:
+                cur.execute(f"""UPDATE mobile_users SET Balance= Balance-{user[5]} WHERE UserID={user[0]}""")
+                db.commit()
+                cur.execute(f"""SELECT Balance FROM mobile_users WHERE UserID={user[0]}""")
+                balance_user = cur.fetchone()[0]
+                print(
+                    f'Было списано с баланса пользователя {user[1]} '
+                    f'ежемесячная плата за установленный период. Баланс пользователя составляет -'
+                    f' {balance_user}')
 
-            print('Активные пользователи:\n')
 
-            for user in data_user:
-                if user[2] == 'Yes':
-                    print(f"Login - {user[1]}, " + f"Active - {user[2]}, " + f"Tariff - {user[3]}.")
+if __name__ == "__main__":
 
-    """Ежемесячная оплата тарифа"""
+    db = sqlite3.connect('mobile.db')
+    cur = db.cursor()
 
-    @staticmethod
-    def withdraw_money(period):
+    create_tables(db, cur)
+    insert_users(db, cur, ('User1', 10000, 2, 'Yes'))
+    insert_users(db, cur, ('User2', 10000, 3, 'Yes'))
+    insert_users(db, cur, ('User3', 10000, 1, 'Yes'))
+    insert_tariff(db, cur, ('Standard', 500))
+    insert_tariff(db, cur, ('VIP', 1000))
+    insert_tariff(db, cur, ('Premium', 1500))
 
-        if period == '0':
-            print('Введён неверный период')
-        else:
+    show_active_user(cur)
 
-            with sqlite3.connect("mobile.db") as db:
-                cur = db.cursor()
-                # Объединённая таблица с тарифами, прайсом и балансом
-                cur.execute(
-                    """SELECT UserID, User_name, Balance, Activity, Tariff, Price FROM mobile_users 
-                    INNER JOIN mobile_tariff ON TariffID = Mobile_tariff_ref;""")
-                data_user = cur.fetchall()
-                user = data_user
+    period = input('\nВведите количество месяцев: ')
+    if not period.isdigit() or float(period) < 0:
+        print("Вы ввели неправильное кол-во месяцев")
 
-                try:
-                    # Цикл для работы со всеми пользователями
-                    for activity in user:
-
-                        if activity[3] == 'No':
-                            continue
-
-                        # Изменение статуса пользователя
-                        elif int(activity[2]) <= int(activity[5]):
-                            cur.execute(f"""UPDATE mobile_users SET Activity='No' WHERE UserID={activity[0]};""")
-                            db.commit()
-                            print('Статус пользователя был изменён')
-
-                        result = int(activity[5]) * int(
-                            period)  # Переменная для расчёта количества нужной суммы за нужный период
-
-                        if int(result) > int(activity[2]):  # Проверка на то, достаточно ли средств у пользователя
-                            print('Недостаточно средств для совершения операции.')
-
-                        else:
-
-                            cur.execute(
-                                f"""UPDATE mobile_users SET Balance= Balance-{result} WHERE UserID={activity[0]}""")
-
-                            cur.execute(f"""SELECT Balance FROM mobile_users WHERE UserID={activity[0]}""")
-                            data_balance = cur.fetchone()
-                            balance_user = data_balance[0]
-                            db.commit()
-                            print(
-                                f'Было списано с баланса пользователя {activity[1]} '
-                                f'ежемесячная плата за установленный период. Баланс пользователя составляет -'
-                                f' {balance_user}')
-                except:
-                    print('Попытка выполнить некорректное действие')
+    withdraw_money(db, cur, int(period))

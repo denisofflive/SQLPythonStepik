@@ -1,34 +1,44 @@
 import csv
+import os
 import random
 import sqlite3
-
 from datetime import datetime
-
-now_date = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
 
 class SQLMobileCallsQuery:
-
     """Создание таблица mobile_users"""
+    MOBILE_CALLS_DB = "mobile_calls.db"
+    REPORT_CSV = 'report_mobile.csv'
+
+    def get_path_to_mobile_calls_db(self):
+        return os.path.join(self.BASE_DIR, self.MOBILE_CALLS_DB)
+
+    def __init__(self, base_dir):
+        self.BASE_DIR = base_dir
+        self.create_table_mobile_users()
+        self.create_table_mobile_price()
 
     @staticmethod
-    def create_table_mobile_users():
+    def generate_now_date():
+        return datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
-        with sqlite3.connect('mobile_calls.db') as db:
+    def create_table_mobile_users(self):
+        """Создание таблицы: mobile_users"""
+        path_to_db = self.get_path_to_mobile_calls_db()
+        with sqlite3.connect(path_to_db) as db:
             cur = db.cursor()
             cur.execute('''
             CREATE TABLE IF NOT EXISTS mobile_users(
             UserID INTEGER PRIMARY KEY AUTOINCREMENT,
             User VARCHAR(255) NOT NULL,
             Balance INTEGER NOT NULL);''')
+            db.commit()
             print("Создание таблицы mobile_users.")
 
-    """Создание таблицы: mobile_price"""
-
-    @staticmethod
-    def create_table_mobile_price():
-
-        with sqlite3.connect('mobile_calls.db') as db:
+    def create_table_mobile_price(self):
+        """Создание таблицы: mobile_users"""
+        path_to_db = self.get_path_to_mobile_calls_db()
+        with sqlite3.connect(path_to_db) as db:
             cur = db.cursor()
             cur.execute('''
                 CREATE TABLE IF NOT EXISTS mobile_price(
@@ -36,70 +46,62 @@ class SQLMobileCallsQuery:
                 Mts_Mts INTEGER NOT NULL,
                 Mts_Tele2 INTEGER NOT NULL,
                 Mts_Yota INTEGER NOT NULL);''')
+            db.commit()
             print("Создание таблицы mobile_price.")
 
-    """Добавление пользователя в таблицу mobile_users
-
-        data_user = (str, int)"""
-    @staticmethod
-    def insert_user(data_user):
-
-        with sqlite3.connect('mobile_calls.db') as db:
+    def insert_user_data(self, data_user):
+        """Добавление пользователя в таблицу mobile_users data_user = (str, int)"""
+        path_to_db = self.get_path_to_mobile_calls_db()
+        with sqlite3.connect(path_to_db) as db:
             cur = db.cursor()
             cur.execute('''
                 INSERT INTO mobile_users (User, Balance)
                 VALUES (?, ?);''', data_user)
             print(f'Добавление пользователя: {data_user}.')
 
-    """Добавление тарифа в таблицу mobile_price
-
-        data_tariff = (int, int, int)"""
-    @staticmethod
-    def insert_price(data_tariff):
-        with sqlite3.connect('mobile_calls.db') as db:
+    def insert_price_data(self, data_tariff):
+        """Добавление тарифа в таблицу mobile_price data_tariff = (int, int, int)"""
+        path_to_db = self.get_path_to_mobile_calls_db()
+        with sqlite3.connect(path_to_db) as db:
             cur = db.cursor()
             cur.execute('''
                     INSERT INTO mobile_price (Mts_Mts, Mts_Tele2, Mts_Yota)
                     VALUES (?, ?, ?);''', data_tariff)
             print(f'Добавление тарифа: {data_tariff}.')
 
-    """Отчет об операциях
-        
+    def generate_report_mobile(self):
+        """Отчет об операциях
         Type_operation:
         1 = Mts_Mts
         2 = Mts_Tele2
         3 = Mts_Yota
         """
-
-    @staticmethod
-    def create_report_mobile():
-
         user_data = [
             ('Date', 'Operator', 'Count_min', 'Amount')
         ]
-        with open('report_mobile.csv', 'a', newline='') as file:
+        path_to_csv = os.path.join(self.BASE_DIR, self.REPORT_CSV)
+        with open(path_to_csv, 'a', newline='') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerows(
                 user_data
             )
-        print('Создан отчет: report_mobile.csv')
+        print(f'Создан отчет: report_mobile.csv.Сохранен по пути: {path_to_csv}')
 
-    @staticmethod
-    def added_data_to_report_mobile(date, operator, minute, amount):
+    def add_data_to_report_mobile(self, date, operator, minute, amount):
         user_data = [
             (date, operator, minute, amount)
         ]
-        with open('report_mobile.csv', 'a', newline='') as file:
+        path_to_csv = os.path.join(self.BASE_DIR, self.REPORT_CSV)
+        with open(path_to_csv, 'a', newline='') as file:
             writer = csv.writer(file, delimiter=';')
             writer.writerows(
                 user_data
             )
-        print('Данные были добавлены в : report_mobile.csv')
+        print('Данные были добавлены в : report_mobile.csv. Сохранен по пути: {path_to_csv}')
 
-    @staticmethod
-    def cycle():
-
-        with sqlite3.connect('mobile_calls.db') as db:
+    def cycle(self):
+        path_to_db = self.get_path_to_mobile_calls_db()
+        with sqlite3.connect(path_to_db) as db:
             cur = db.cursor()
             cur.execute('''
             SELECT Mts_Mts, Mts_Tele2, Mts_Yota FROM mobile_price''')
@@ -118,8 +120,8 @@ class SQLMobileCallsQuery:
                     UPDATE mobile_users
                     SET Balance = Balance - {amount};''')
                     db.commit()
-                    SQLMobileCallsQuery.added_data_to_report_mobile(
-                        now_date, operator.get(random_operator), random_minute, amount)
+                    now_date = self.generate_now_date()
+                    self.add_data_to_report_mobile(now_date, operator.get(random_operator), random_minute, amount)
                     count -= 1
                     cur.execute('''
                             SELECT Balance FROM mobile_users''')
@@ -136,4 +138,8 @@ class SQLMobileCallsQuery:
         final_balance = cur.fetchone()
         print('Итоговый баланс:', final_balance[0])
 
-SQLMobileCallsQuery.create_report_mobile()
+
+if __name__ == "__main__":
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    mobile_calls = SQLMobileCallsQuery(BASE_DIR)
+    mobile_calls.generate_report_mobile()
